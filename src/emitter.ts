@@ -203,6 +203,18 @@ export const ContentIndex: QuartzEmitterPlugin<Partial<Options>> = (opts) => {
       }),
     );
 
+    // static/metadata.json：构建时间戳，供前端组件（如 explorer-pro）作废 sessionStorage 缓存。
+    // v5 页面不注入 fetchMetadata 全局，组件改为自行 fetch 该文件。
+    const metaFp = joinSegments("static", "metadata") as unknown as FullSlug;
+    outputs.push(
+      await write({
+        ctx,
+        content: JSON.stringify({ lastBuildTime: Date.now() }),
+        slug: metaFp,
+        ext: ".json",
+      }),
+    );
+
     return outputs;
   };
 
