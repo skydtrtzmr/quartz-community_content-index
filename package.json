@@ -1,7 +1,7 @@
 {
-  "name": "@quartz-community/content-index",
+  "name": "content-index-pro",
   "version": "1.0.0",
-  "description": "Content index emitter plugin for Quartz. Generates sitemap, RSS feed, and content index JSON.",
+  "description": "Content index emitter plugin for Quartz (Pro fork). Generates sitemap, RSS feed, and content index JSON with per-page frontmatter kept for field-based search.",
   "type": "module",
   "license": "MIT",
   "author": "Quartz Community",
@@ -75,14 +75,14 @@
     "@changesets/cli": "^2.29.2"
   },
   "quartz": {
-    "name": "content-index",
-    "displayName": "Content Index",
+    "name": "content-index-pro",
+    "displayName": "Content Index Pro",
     "category": "emitter",
     "version": "1.0.0",
     "quartzVersion": ">=5.0.0",
     "dependencies": [],
     "defaultOrder": 50,
-    "defaultEnabled": true,
+    "defaultEnabled": false,
     "defaultOptions": {
       "enableSiteMap": true,
       "enableRSS": true,

@@ -27,6 +27,8 @@ export type ContentDetails = {
   richContent?: string;
   date?: Date;
   description?: string;
+  /** Page frontmatter, kept for field-based (e.g. `@key:value`) client-side search. */
+  frontmatter?: Record<string, unknown>;
 };
 
 interface Options {
@@ -155,6 +157,7 @@ export const ContentIndex: QuartzEmitterPlugin<Partial<Options>> = (opts) => {
               : undefined,
           date: date,
           description: (data.description as string | undefined) ?? "",
+          frontmatter,
         });
       }
     }
