@@ -222,6 +222,124 @@ export const ContentIndex: QuartzEmitterPlugin<Partial<Options>> = (opts) => {
     name: "ContentIndex",
     emit: (ctx, content) => emitAll(ctx, content),
     // RSS auto-discovery link tag should be added via a component plugin or manually in the layout.
-    partialEmit: (ctx, content) => emitAll(ctx, content),
+    // content 是当前发布集合（含插件生成页），changeEvents 仅含源文件变化。
+    // 正文沿用磁盘基线；成员增删以 content 为准，避免遗留虚拟页或过滤掉的页。
+    async *partialEmit(ctx, content, _resources, changeEvents) {
+      console.log("ContentIndex: partialEmit");
+
+      const cfg = ctx.cfg.configuration;
+      const fp = joinSegments("static", "contentIndex") as unknown as FullSlug;
+      const contentIndexPath = joinSegments(ctx.argv.output, "static", "contentIndex.json");
+      let existingIndex: Record<string, ContentDetails> = {};
+
+      try {
+        const existingContent = await fs.readFile(contentIndexPath, "utf-8");
+        existingIndex = JSON.parse(existingContent) as Record<string, ContentDetails>;
+        console.log(
+          `ContentIndex: Loaded existing index with ${Object.keys(existingIndex).length} entries`,
+        );
+      } catch (error) {
+        throw new Error(
+          "ContentIndex: incremental baseline is missing or invalid; rebuild with --reset",
+          {
+            cause: error,
+          },
+        );
+      }
+
+      const currentSlugs = new Set(content.map(([, file]) => file.data.slug));
+      // v5 dispatcher 扩展的标准生成页集合；兼容尚未声明它的社区类型包。
+      const virtualPages =
+        (ctx as BuildCtx & { virtualPages?: ProcessedContent[] }).virtualPages ?? [];
+      const generatedSlugs = new Set(virtualPages.map(([, file]) => file.data.slug));
+      const changedSlugs = new Set(changeEvents.map((event) => event.file?.data.slug));
+      for (const slug of Object.keys(existingIndex)) {
+        if (!currentSlugs.has(slug as FullSlug)) {
+          delete existingIndex[slug];
+        }
+      }
+
+      for (const [tree, file] of content) {
+        const data = (file.data as Record<string, unknown>) ?? {};
+        const slug = data.slug as FullSlug;
+        const text = data.text as string | undefined;
+        const frontmatter = (data.frontmatter as Record<string, unknown> | undefined) ?? {};
+
+        if (data.unlisted === true) {
+          delete existingIndex[slug];
+          continue;
+        }
+
+        // SQLite 未变更页只恢复元数据，不能拿空正文覆盖完整的搜索索引。
+        if (text === undefined && !changedSlugs.has(slug) && !generatedSlugs.has(slug)) {
+          if (!existingIndex[slug] && options.includeEmptyFiles) {
+            throw new Error(`ContentIndex: baseline is missing ${slug}; rebuild with --reset`);
+          }
+          continue;
+        }
+        if (!options.includeEmptyFiles && !text) {
+          delete existingIndex[slug];
+          continue;
+        }
+
+        const isEncrypted = data.encrypted === true;
+        existingIndex[slug] = {
+          slug,
+          filePath: data.relativePath as FilePath,
+          title: (frontmatter.title as string) ?? slug,
+          links: (data.links as SimpleSlug[] | undefined) ?? [],
+          tags: (frontmatter.tags as string[] | undefined) ?? [],
+          content: text ?? "",
+          richContent:
+            options.rssFullHtml && !isEncrypted && tree
+              ? escapeHTML(toHtml(tree as Root, { allowDangerousHtml: true }))
+              : undefined,
+          frontmatter,
+        };
+        console.log(`ContentIndex: Updated ${slug}`);
+      }
+
+      console.log(`ContentIndex: Final index has ${Object.keys(existingIndex).length} entries`);
+
+      const metaFp = joinSegments("static", "metadata") as unknown as FullSlug;
+      yield write({
+        ctx,
+        content: JSON.stringify({ lastBuildTime: Date.now() }),
+        slug: metaFp,
+        ext: ".json",
+      });
+
+      yield write({
+        ctx,
+        content: JSON.stringify(existingIndex),
+        slug: fp,
+        ext: ".json",
+      });
+
+      if (options.enableSiteMap || options.enableRSS) {
+        const linkIndex: ContentIndexMap = new Map();
+        for (const [slug, details] of Object.entries(existingIndex)) {
+          linkIndex.set(slug as FullSlug, { ...details, date: new Date() });
+        }
+
+        if (options.enableSiteMap) {
+          yield write({
+            ctx,
+            content: generateSiteMap(cfg, linkIndex),
+            slug: "sitemap" as FullSlug,
+            ext: ".xml",
+          });
+        }
+
+        if (options.enableRSS) {
+          yield write({
+            ctx,
+            content: generateRSSFeed(cfg, linkIndex, options, options.rssLimit),
+            slug: (options.rssSlug ?? "index") as FullSlug,
+            ext: ".xml",
+          });
+        }
+      }
+    },
   };
 };
