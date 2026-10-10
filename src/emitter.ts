@@ -253,6 +253,7 @@ export const ContentIndex: QuartzEmitterPlugin<Partial<Options>> = (opts) => {
         (ctx as BuildCtx & { virtualPages?: ProcessedContent[] }).virtualPages ?? [];
       const generatedSlugs = new Set(virtualPages.map(([, file]) => file.data.slug));
       const changedSlugs = new Set(changeEvents.map((event) => event.file?.data.slug));
+      let updatedCount = 0;
       for (const slug of Object.keys(existingIndex)) {
         if (!currentSlugs.has(slug as FullSlug)) {
           delete existingIndex[slug];
@@ -296,9 +297,10 @@ export const ContentIndex: QuartzEmitterPlugin<Partial<Options>> = (opts) => {
               : undefined,
           frontmatter,
         };
-        console.log(`ContentIndex: Updated ${slug}`);
+        updatedCount++;
       }
 
+      console.log(`ContentIndex: updated ${updatedCount} entries`);
       console.log(`ContentIndex: Final index has ${Object.keys(existingIndex).length} entries`);
 
       const metaFp = joinSegments("static", "metadata") as unknown as FullSlug;
