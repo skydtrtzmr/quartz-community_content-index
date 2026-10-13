@@ -29,6 +29,8 @@ export type ContentDetails = {
   description?: string;
   /** Page frontmatter, kept for field-based (e.g. `@key:value`) client-side search. */
   frontmatter?: Record<string, unknown>;
+  /** Generated placeholder for a referenced page that does not exist. */
+  virtualNode?: boolean;
 };
 
 interface Options {
@@ -158,6 +160,7 @@ export const ContentIndex: QuartzEmitterPlugin<Partial<Options>> = (opts) => {
           date: date,
           description: (data.description as string | undefined) ?? "",
           frontmatter,
+          ...(data.virtualNode === true ? { virtualNode: true } : {}),
         });
       }
     }
@@ -296,6 +299,7 @@ export const ContentIndex: QuartzEmitterPlugin<Partial<Options>> = (opts) => {
               ? escapeHTML(toHtml(tree as Root, { allowDangerousHtml: true }))
               : undefined,
           frontmatter,
+          ...(data.virtualNode === true ? { virtualNode: true } : {}),
         };
         updatedCount++;
       }
